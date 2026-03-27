@@ -1,13 +1,14 @@
 # ==============================================================================
-# Simulation Study: Scenario 1 (2 Clusters, Exponential Distribution)
+# Simulation Study: Scenario 4 (3 Clusters, Exponential Distribution)
 # ==============================================================================
 #
 # This script performs a simulation study to evaluate milestone event time
 # prediction methods using covariate-driven clustering.
+#
 # Output:
-#   - all_results_by_clus_exp_v2_n_[n_total].rds: Complete simulation results
-#   - predict_rae_by_clus_exp_v2_n_[n_total].csv: Results by landmark time
-#   - predict_IF_rae_by_clus_exp_v2_n_[n_total].csv: Results by information fraction
+#   - all_results_s4_n_[n_total].rds: Complete simulation results
+#   - predict_timepoints_s4_n_[n_total].csv: Results by landmark time
+#   - predict_if_s4_n_[n_total].csv: Results by information fraction
 #
 # ==============================================================================
 
@@ -24,11 +25,15 @@ library(MASS)
 # Source shared functions
 source("simulation_functions.R")
 
+scenario <- "less"
+
 # Define constants
 n_total <- 500
-n1 <- n2 <- n_total / 2
+n1 <- floor(n_total / 3)
+n2 <- floor(n_total / 3)
+n3 <- n_total - n1 - n2 
 n_simulations <- 1000
-FU_time <- 18
+FU_time <- 24
 target_event <- 0.7*n_total
 n_cores <- detectCores()
 
@@ -37,43 +42,58 @@ model_types <- c("Exponential", "Weibull")
 
 # Define hazard effects
 betas1 <- c(age = 0.03, gender = 0.2, hemoglobin = -0.3, tumor_burden = 0.03)
-betas2 <- c(age = 0.02, gender = 0.1, hemoglobin = -0.1, tumor_burden = 0.01)
+betas2 <- c(age = 0.02, gender = 0.1, hemoglobin = -0.15, tumor_burden = 0.01)
+betas3 <- c(age = 0.01, gender = 0.05, hemoglobin = -0.1, tumor_burden = 0.01)
 
-lambda1 <- 0.15
-gamma1 <- 1
-lambda2 <- 0.05
-gamma2 <- 1
+lambda1 <- 0.1
+lambda2 <- 0.12
+lambda3 <- 0.06
 
-# Generate cluster-specific patient covariates (Scenario 1)
+# Generate cluster-specific patient covariates (Scenario 4)
 simulate_covariates <- function(n, cluster_id) {
   if (cluster_id == 1) {
+    # Cluster 1: older, more male, moderate tumor burden
     data.frame(
       id = seq_len(n),
       cluster = cluster_id,
       age = rnorm(n, mean = 65, sd = 5),
       gender = rbinom(n, 1, 0.7),
-      race = sample(c("White", "Black", "Other"), n, replace = TRUE, prob = c(0.8, 0.1, 0.1)),
-      kps = sample(1:4, n, replace = TRUE, prob = c(0.4, 0.4, 0.1, 0.1)),
-      hemoglobin = rnorm(n, mean = 11, sd = 1),
-      disease_sites = sample(1:5, n, replace = TRUE, prob = c(0.1, 0.1, 0.2, 0.2, 0.4)),
-      tumor_burden = rnorm(n, mean = 70, sd = 8)
+      race = sample(c("White", "Black", "Other"), n, replace = TRUE, prob = c(0.7, 0.2, 0.1)),
+      kps = sample(1:4, n, replace = TRUE, prob = c(0.35, 0.3, 0.2, 0.15)),
+      hemoglobin = rnorm(n, mean = 12.5, sd = 1),
+      disease_sites = sample(1:5, n, replace = TRUE, prob = c(0.2, 0.25, 0.25, 0.15, 0.15)),
+      tumor_burden = rnorm(n, mean = 60, sd = 6)
     )
-  } else {
+  } else if (cluster_id == 2) {
+    # Cluster 2: slightly younger, more female, slightly lower tumor burden
     data.frame(
       id = seq_len(n) + n1,
       cluster = cluster_id,
-      age = rnorm(n, mean = 55, sd = 5),
-      gender = rbinom(n, 1, 0.3),
-      race = sample(c("White", "Black", "Other"), n, replace = TRUE, prob = c(0.4, 0.3, 0.3)),
-      kps = sample(1:4, n, replace = TRUE, prob = c(0.1, 0.1, 0.4, 0.4)),
-      hemoglobin = rnorm(n, mean = 15, sd = 1),
-      disease_sites = sample(1:5, n, replace = TRUE, prob = c(0.5, 0.2, 0.1, 0.1, 0.1)),
-      tumor_burden = rnorm(n, mean = 40, sd = 8)
+      age = rnorm(n, mean = 61, sd = 5),
+      gender = rbinom(n, 1, 0.4),
+      race = sample(c("White", "Black", "Other"), n, replace = TRUE, prob = c(0.65, 0.25, 0.1)),
+      kps = sample(1:4, n, replace = TRUE, prob = c(0.3, 0.3, 0.2, 0.2)),
+      hemoglobin = rnorm(n, mean = 13.5, sd = 1),
+      disease_sites = sample(1:5, n, replace = TRUE, prob = c(0.25, 0.2, 0.2, 0.2, 0.15)),
+      tumor_burden = rnorm(n, mean = 52, sd = 6)
     )
+  } else if (cluster_id == 3) {
+    # Cluster 3: clearly distinct: younger, mostly female, high hemoglobin, low tumor burden
+    data.frame(
+      id = seq_len(n) + n1 + n2,
+      cluster = cluster_id,
+      age = rnorm(n, mean = 50, sd = 5),
+      gender = rbinom(n, 1, 0.2),
+      race = sample(c("White", "Black", "Other"), n, replace = TRUE, prob = c(0.4, 0.3, 0.3)),
+      kps = sample(1:4, n, replace = TRUE, prob = c(0.15, 0.15, 0.3, 0.4)),
+      hemoglobin = rnorm(n, mean = 15.5, sd = 1),
+      disease_sites = sample(1:5, n, replace = TRUE, prob = c(0.35, 0.25, 0.2, 0.1, 0.1)),
+      tumor_burden = rnorm(n, mean = 35, sd = 5)
+    )
+  } else {
+    stop("Invalid cluster ID")
   }
 }
-
-
 
 
 
@@ -95,12 +115,12 @@ sim_func <- function(i, clustering_methods, model_types, targetev, sims, n_clus)
     covs3 <- simulate_covariates(n3, 3)
     covs_all <- bind_rows(covs1, covs2, covs3)
     
-    sim1 <- simsurv(dist = "weibull", lambdas = lambda1, gammas = gamma1, betas = betas1,
-                    x = covs1, maxt = 5)
-    sim2 <- simsurv(dist = "weibull", lambdas = lambda2, gammas = gamma2, betas = betas2,
-                    x = covs2, maxt = 5)
-    sim3 <- simsurv(dist = "weibull", lambdas = lambda3, gammas = gamma3, betas = betas3,
-                    x = covs3, maxt = 5)
+    sim1 <- simsurv(dist = "exponential", lambdas = lambda1, betas = betas1,
+                    x = covs1)
+    sim2 <- simsurv(dist = "exponential", lambdas = lambda2, betas = betas2,
+                    x = covs2)
+    sim3 <- simsurv(dist = "exponential", lambdas = lambda3, betas = betas3,
+                    x = covs3)
     sim_all <- bind_rows(sim1, sim2, sim3)
   }
   
@@ -151,7 +171,7 @@ sim_func <- function(i, clustering_methods, model_types, targetev, sims, n_clus)
         modeltypes = model_types,
         criterion = "BIC",
         targetev = targetev,
-        time_points = as.integer(seq.int(2, 14, length.out = 6)),
+        time_points = as.integer(seq.int(2, FU_time, length.out = 6)),
         sims = sims,
         n_clus = n_clus,
         sim_id = i)
@@ -194,15 +214,15 @@ plan(multisession, workers = n_cores)
 all_results <- future_lapply(1:n_simulations, sim_func,
                              clustering_methods = clustering_methods,
                              model_types = model_types, targetev = target_event, sims = 1000, 
-                             n_clus = 2, future.seed = TRUE)
+                             n_clus = 3, future.seed = TRUE)
 
 rolling_results <- bind_rows(lapply(all_results, `[[`, "rolling"))
 info_results    <- bind_rows(lapply(all_results, `[[`, "info"))
 #full_data_all   <- bind_rows(lapply(all_results, `[[`, "full_data"))
 
-saveRDS(all_results, paste0("all_results_by_clus_exp_v2_n_", n_total,".rds"))
+saveRDS(all_results, paste0("all_results_s4_n_", n_total,".rds"))
 
-#rm(all_results)
+rm(all_results)
 gc()
 
 # save rolling results
@@ -245,7 +265,7 @@ summary_by_time <- summary_rolling %>%
     .groups = "drop"
   )
 
-write.csv(summary_by_time, paste0("predict_rae_by_clus_exp_v2_n_", n_total, ".csv"))
+write.csv(summary_by_time, paste0("predict_timepoints_s4_n_", n_total, ".csv"))
 
 # save IF results
 summary_if <- info_results %>%
@@ -287,7 +307,6 @@ summary_by_IF <- summary_if %>%
     .groups = "drop"
   )
 
-write.csv(summary_by_IF, paste0("predict_IF_rae_by_clus_exp_v2_n_", n_total, ".csv"))
-
+write.csv(summary_by_IF, paste0("predict_if_s4_n_", n_total, ".csv"))
 
 

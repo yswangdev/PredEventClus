@@ -35,15 +35,22 @@ The following data files are required in the working directory when running `rea
 Simulation scripts generate the following output files:
 
 1. **Complete Results (RDS format)**:
-   - `all_results_s[1-3]_n_[n_total].rds`: Full simulation results including all iterations
-   - `all_results_s2_v2[n]_n_[n_total].rds`: Scenario 2 variant results
-   - `all_results_by_clus_exp_v2_n_[n_total].rds`: Scenario 1 variant results
+   - `all_results_no_clus_s1_n_[n_total].rds`: Scenario 1 (no true clustering) results
+   - `all_results_s2_n_[n_total].rds`: Scenario 2 full simulation results
+   - `all_results_s3_[scenario]_n_[n_total].rds`: Scenario 3 full simulation results
+   - `all_results_s4_n_[n_total].rds`: Scenario 4 full simulation results
 
 2. **Summary Results (CSV format)**:
-   - `predict_timepoints_s[1-3]_n_[n_total].csv`: Results aggregated by landmark time
-   - `predict_IF_s[1-3]_n_[n_total].csv`: Results aggregated by information fraction
-   - `predict_rae_by_clus_exp_v2_n_[n_total].csv`: Scenario 1 RAE results
-   - `predict_IF_rae_by_clus_exp_v2_n_[n_total].csv`: Scenario 1 IF results
+   - `predict_timepoints_no_clus_s1_n_[n_total].csv`: Scenario 1 landmark-time summary
+   - `predict_timepoints_s2_n_[n_total].csv`: Scenario 2 landmark-time summary
+   - `predict_timepoints_s3_[scenario]_n_[n_total].csv`: Scenario 3 landmark-time summary
+   - `predict_timepoints_s4_n_[n_total].csv`: Scenario 4 landmark-time summary
+   - `predict_if_no_clus_s1_n_[n_total].csv`: Scenario 1 information-fraction summary
+   - `predict_if_s2_n_[n_total].csv`: Scenario 2 information-fraction summary
+   - `predict_if_s3_[scenario]_n_[n_total].csv`: Scenario 3 information-fraction summary
+   - `predict_if_s4_n_[n_total].csv`: Scenario 4 information-fraction summary
+   - `compare_vs_none_timepoints_no_clus_s1_n_[n_total].csv`: Scenario 1 comparison vs original method
+   - `compare_vs_none_if_no_clus_s1_n_[n_total].csv`: Scenario 1 IF comparison vs original method
 
 ### Real-World Results
 

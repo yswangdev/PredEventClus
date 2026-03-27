@@ -14,96 +14,130 @@
 #
 # ==============================================================================
 
-# Load required libraries
-library(survival)      
-library(flexsurv)    
-library(MASS)              
-library(dplyr)         
-library(survminer)    
+# Required libraries
+library(survival)
+library(dplyr)
+library(survminer)
+library(cluster)
+library(ggplot2)
 
-# Clustering packages
-library(cluster)        
-library(clustMixType)  
-library(DisimForMixed) 
-library(mclust)         
-library(factoextra)     
+# ------------------------------------------------------------------------------
+# User configuration
+# ------------------------------------------------------------------------------
 
-# ==============================================================================
-# Load Simulation Results
-# ==============================================================================
+# Examples:
+# results_rds_path <- "all_results_no_clus_s1_n_500.rds"       # Scenario 1
+# results_rds_path <- "all_results_s2_n_500.rds"               # Scenario 2
+# results_rds_path <- "all_results_s3_less_n_500.rds"          # Scenario 3
+# results_rds_path <- "all_results_s4_n_500.rds"               # Scenario 4
+results_rds_path <- "all_results_no_clus_s1_n_500.rds"
+scenario_label <- ifelse(
+  grepl("^all_results_no_clus_s1_n_", results_rds_path),
+  "Scenario 1",
+  ifelse(
+    grepl("^all_results_s2_n_", results_rds_path),
+    "Scenario 2",
+    ifelse(
+      grepl("^all_results_s3_", results_rds_path),
+      "Scenario 3",
+      ifelse(
+        grepl("^all_results_s4_n_", results_rds_path),
+        "Scenario 4",
+        "Simulation Scenario"
+      )
+    )
+  )
+)
+sim_index <- 1
 
-# Load simulation results 
-all_results_s1_n_500 <- readRDS("all_results_s1_n_500.rds")
+# ------------------------------------------------------------------------------
+# Helpers
+# ------------------------------------------------------------------------------
 
-full_data <- all_results_s1_n_500[[1]]$full_data
+extract_full_data <- function(all_results, sim_index = 1) {
+  if (!is.list(all_results) || length(all_results) < sim_index) {
+    stop("Invalid all_results object or sim_index out of range.")
+  }
+  if (is.null(all_results[[sim_index]]$full_data)) {
+    stop("full_data not found in selected simulation result.")
+  }
+  all_results[[sim_index]]$full_data
+}
 
-# ==============================================================================
-# Kaplan-Meier Survival Curves
-# ==============================================================================
+make_cluster_labels <- function(cluster_vec) {
+  levels_vec <- sort(unique(cluster_vec))
+  paste("Cluster", levels_vec)
+}
 
-# Create survival object (time to event, event indicator)
+prepare_mixed_data <- function(full_data) {
+  req_cols <- c("age", "hemoglobin", "tumor_burden", "gender", "race", "kps", "disease_sites")
+  missing_cols <- setdiff(req_cols, names(full_data))
+  if (length(missing_cols) > 0) {
+    stop(paste("Missing required columns for MDS:", paste(missing_cols, collapse = ", ")))
+  }
+
+  full_data %>%
+    dplyr::select(all_of(req_cols)) %>%
+    mutate(across(c(gender, race, kps, disease_sites), as.factor))
+}
+
+# ------------------------------------------------------------------------------
+# Load selected simulation output
+# ------------------------------------------------------------------------------
+
+all_results <- readRDS(results_rds_path)
+full_data <- extract_full_data(all_results, sim_index = sim_index)
+
+# Ensure cluster is a factor for consistent legends/colors
+if (!("cluster" %in% names(full_data))) {
+  stop("Column `cluster` not found in full_data.")
+}
+full_data$cluster <- factor(full_data$cluster)
+
+# ------------------------------------------------------------------------------
+# 1) Kaplan-Meier curve by true cluster
+# ------------------------------------------------------------------------------
+
 surv_obj <- Surv(time = full_data$time, event = full_data$status)
-
-# Fit Kaplan-Meier curves stratified by true cluster
 fit <- survfit(surv_obj ~ cluster, data = full_data)
+cluster_labs <- make_cluster_labels(as.integer(as.character(full_data$cluster)))
 
-# Plot using ggsurvplot (publication-ready plots)
-ggsurvplot(
+km_plot <- ggsurvplot(
   fit,
   data = full_data,
-  risk.table = TRUE,        # Show number at risk table
-  pval = TRUE,              # Display log-rank test p-value
-  conf.int = TRUE,          # Show confidence intervals
+  risk.table = TRUE,
+  pval = TRUE,
+  conf.int = TRUE,
   legend.title = "True Cluster",
-  # Adjust legend labels based on number of clusters
-  # For 2 clusters:
-  legend.labs = c("Cluster 1", "Cluster 2"),
-  # For 3 clusters, use:
-  # legend.labs = c("Cluster 1", "Cluster 2", "Cluster 3"),
-  palette = "Set1",         # Color palette
-  title = "Scenario 1",     # Plot title
-  xlab = "Time",            # X-axis label
-  ylab = "Survival Probability"  # Y-axis label
+  legend.labs = cluster_labs,
+  palette = "Set1",
+  title = scenario_label,
+  xlab = "Time",
+  ylab = "Survival Probability"
 )
 
-# ==============================================================================
-# Multi-Dimensional Scaling (MDS) Plot
-# ==============================================================================
-# MDS reduces high-dimensional data to 2D for visualization
-# Useful for visualizing cluster separation in covariate space
+print(km_plot)
 
-# Prepare mixed-type covariates for clustering
-mixed_data <- full_data %>%
-  dplyr::select(age, hemoglobin, tumor_burden, gender, race, kps, disease_sites) %>%
-  mutate(across(c(gender, race, kps, disease_sites), as.factor))
+# ------------------------------------------------------------------------------
+# 2) MDS plot for mixed covariates
+# ------------------------------------------------------------------------------
 
-# Compute Gower distance matrix for mixed-type data
-# Gower distance handles both continuous and categorical variables
-gower_dist <- daisy(
-  mixed_data,
-  metric = "gower"
-)
-
-# Perform classical MDS (2 dimensions)
+mixed_data <- prepare_mixed_data(full_data)
+gower_dist <- daisy(mixed_data, metric = "gower")
 mds_coords <- cmdscale(gower_dist, k = 2)
 
-# Prepare data frame for plotting
 mds_df <- as.data.frame(mds_coords)
 colnames(mds_df) <- c("Dim1", "Dim2")
+mds_df$cluster <- full_data$cluster
 
-# Add cluster labels (assuming covs_all exists from simulation)
-# Note: This requires covs_all to be available in the environment
-# If not available, use: mds_df$cluster <- factor(full_data$cluster)
-mds_df$cluster <- factor(full_data$cluster)
-
-# Visualize clusters in 2D MDS space
-library(ggplot2)
-ggplot(mds_df, aes(x = Dim1, y = Dim2, color = cluster)) +
-  geom_point(size = 2) +
+mds_plot <- ggplot(mds_df, aes(x = Dim1, y = Dim2, color = cluster)) +
+  geom_point(size = 2, alpha = 0.8) +
   labs(
-    title = "Scenario 1 MDS Dimension Reduction",
+    title = paste0(scenario_label, ": MDS of Mixed Covariates"),
     x = "MDS Dimension 1",
     y = "MDS Dimension 2",
-    color = "Cluster"
+    color = "True Cluster"
   ) +
   theme_minimal()
+
+print(mds_plot)

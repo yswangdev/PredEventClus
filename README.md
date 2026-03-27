@@ -11,19 +11,24 @@ This project implements and evaluates various clustering methods (PAM, Hierarchi
 
 ### Simulation Studies
 
-#### Scenario 1 (2 clusters, well separatered)
+#### Scenario 1 (no true clustering; compare original vs clustering methods)
 ```r
-source("Simulation/sum_by_2clus_S1.R")
+source("Simulation/sim_by_no_clus_S1.R")
 ```
 
-#### Scenario 2 (2 clusters, less separated)
+#### Scenario 2 (2 clusters, well separated)
 ```r
 source("Simulation/sim_by_2clus_S2.R")
 ```
 
-#### Scenario 3 (3 clusters, mid-level separated)
+#### Scenario 3 (2 clusters, less separated)
 ```r
-source("Simulation/sim_by_3clus_S3.R")
+source("Simulation/sim_by_2clus_S3.R")
+```
+
+#### Scenario 4 (3 clusters, mid-level separated)
+```r
+source("Simulation/sim_by_3clus_S4.R")
 ```
 
 ### Real-World Data Analysis
@@ -51,9 +56,10 @@ source("Visualization/codes_for_plots.R")
 ## Output Files
 
 ### Simulation Results
-- `predict_timepoints_s[1-3]_n_[n].csv` - Results by landmark time
-- `predict_IF_s[1-3]_n_[n].csv` - Results by information fraction
-- `all_results_s[1-3]_n_[n].rds` - Complete simulation results (RDS format)
+- `predict_timepoints_no_clus_s1_n_[n].csv` / `predict_if_no_clus_s1_n_[n].csv` - Scenario 1 results
+- `predict_timepoints_s2_n_[n].csv` / `predict_if_s2_n_[n].csv` - Scenario 2 results
+- `predict_timepoints_s3_[scenario]_n_[n].csv` / `predict_if_s3_[scenario]_n_[n].csv` - Scenario 3 results
+- `predict_timepoints_s4_n_[n].csv` / `predict_if_s4_n_[n].csv` - Scenario 4 results
 
 ### Real-World Results
 - `[n]_[k]clus_BIC.csv` - Prediction metrics
