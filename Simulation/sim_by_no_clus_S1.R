@@ -5,6 +5,8 @@
 # This script evaluates milestone event time prediction when there is no true
 # cluster structure. A single cohort (one true cluster) is generated, then
 # "None" (original method) is compared against clustering-based methods.
+# Clustering methods are run with k = 2 to assess behavior when the truth is
+# homogeneous (no separation to recover).
 #
 # Output:
 #   - all_results_no_clus_s1_n_[n_total].rds
@@ -38,12 +40,16 @@ FU_time <- 18
 target_event <- 0.7 * n_total
 n_cores <- detectCores()
 
+# Number of clusters for PAM / hierarchical / K-prototypes / Kamila (data remain one true cluster).
+n_clus_fit <- 2
+
 # "None" is the original method (no clustering); others are clustering methods.
 clustering_methods <- c("None", "PAM", "Hierarchical", "K-prototypes", "Kamila")
 model_types <- c("Exponential", "Weibull")
 
 # Scenario 1 parameters for a single homogeneous cohort.
 betas_common <- c(age = 0.03, gender = 0.2, hemoglobin = -0.3, tumor_burden = 0.03)
+# Lower baseline hazard so the true milestone tends to occur later (>11 months).
 lambda_common <- 0.15
 gamma_common <- 1
 
@@ -52,13 +58,15 @@ simulate_covariates <- function(n) {
   data.frame(
     id = seq_len(n),
     cluster = 1,
-    age = rnorm(n, mean = 65, sd = 5),
-    gender = rbinom(n, 1, 0.7),
-    race = sample(c("White", "Black", "Other"), n, replace = TRUE, prob = c(0.8, 0.1, 0.1)),
-    kps = sample(1:4, n, replace = TRUE, prob = c(0.4, 0.4, 0.1, 0.1)),
-    hemoglobin = rnorm(n, mean = 11, sd = 1),
-    disease_sites = sample(1:5, n, replace = TRUE, prob = c(0.1, 0.1, 0.2, 0.2, 0.4)),
-    tumor_burden = rnorm(n, mean = 70, sd = 8)
+    age = rnorm(n, mean = 60, sd = 5),
+      hemoglobin = rnorm(n, mean = 13, sd = 1),
+      tumor_burden = rnorm(n, mean = 55, sd = 10),
+      gender = rbinom(n, 1, 0.55),
+      race = sample(c("White", "Black", "Other"), n, replace = TRUE, 
+                   prob = c(0.6, 0.2, 0.2)),
+      kps = sample(1:4, n, replace = TRUE, prob = c(0.3, 0.3, 0.2, 0.2)),
+      disease_sites = sample(1:5, n, replace = TRUE, 
+                            prob = c(0.2, 0.2, 0.2, 0.2, 0.2))
   )
 }
 
@@ -158,7 +166,7 @@ all_results <- future_lapply(
   model_types = model_types,
   targetev = target_event,
   sims = 1000,
-  n_clus = 1,
+  n_clus = n_clus_fit,
   future.seed = TRUE
 )
 
@@ -233,37 +241,3 @@ summary_by_IF <- summary_if %>%
   )
 
 write.csv(summary_by_IF, paste0("predict_if_no_clus_s1_n_", n_total, ".csv"))
-
-# ==============================================================================
-# Explicit comparison: original (None) vs clustering methods
-# ==============================================================================
-
-none_by_time <- summary_by_time %>%
-  filter(Clustering_Method == "None") %>%
-  dplyr::select(Landmark_Time, None_Mean_RAE = Mean_RAE, None_Mean_ERR = Mean_ERR, None_MEAN_AE = MEAN_AE)
-
-compare_vs_none_time <- summary_by_time %>%
-  filter(Clustering_Method != "None") %>%
-  left_join(none_by_time, by = "Landmark_Time") %>%
-  mutate(
-    Delta_RAE_vs_None = Mean_RAE - None_Mean_RAE,
-    Delta_ERR_vs_None = Mean_ERR - None_Mean_ERR,
-    Delta_AE_vs_None = MEAN_AE - None_MEAN_AE
-  )
-
-write.csv(compare_vs_none_time, paste0("compare_vs_none_timepoints_no_clus_s1_n_", n_total, ".csv"))
-
-none_by_if <- summary_by_IF %>%
-  filter(Clustering_Method == "None") %>%
-  dplyr::select(IF, None_Mean_RAE = Mean_RAE, None_Mean_ERR = Mean_ERR, None_MEAN_AE = MEAN_AE)
-
-compare_vs_none_if <- summary_by_IF %>%
-  filter(Clustering_Method != "None") %>%
-  left_join(none_by_if, by = "IF") %>%
-  mutate(
-    Delta_RAE_vs_None = Mean_RAE - None_Mean_RAE,
-    Delta_ERR_vs_None = Mean_ERR - None_Mean_ERR,
-    Delta_AE_vs_None = MEAN_AE - None_MEAN_AE
-  )
-
-write.csv(compare_vs_none_if, paste0("compare_vs_none_if_no_clus_s1_n_", n_total, ".csv"))
